@@ -2,7 +2,7 @@
   "name": "busybar-json-widget",
   "private": true,
   "version": "0.1.0",
-  "description": "Any number from any JSON endpoint, with thresholds.",
+  "description": "A number or a line of text from any JSON or plain-text endpoint, with thresholds.",
   "author": "vvzvlad",
   "type": "module",
   "scripts": {

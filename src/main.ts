@@ -1,3 +1,4 @@
+import { textWidth } from "@busy-app/busy-lib";
 import { createScreen, type Element } from "./screen";
 import { loadValues, type SettingsValues } from "./settings";
 import manifest from "./appmeta/manifest.json";
@@ -10,8 +11,21 @@ const GRAY = "#A0A0A0FF";
 const YELLOW = "#FFC000FF";
 const RED = "#FF2020FF";
 
+/** A plain-text answer is cut to this many characters. */
+const MAX_TEXT = 100;
+/** Pixels between the label and a text after it. */
+const TEXT_GAP = 3;
+/**
+ * Fonts that are never measured. Once textWidth is imported, busy-cli bundles into the heap the glyph map of every
+ * font a literal `font:` names; one named by a constant is left out. Only `small`, of the label and the unit, is measured.
+ */
+const NUMBER_FONT = "extra_large";
+const TEXT_FONT = "normal";
+
 type Settings = {
   url: string;
+  /** "text": the whole answer is the value, `path` is not used. */
+  format: "json" | "text";
   path: string;
   label: string;
   unit: string;
@@ -29,6 +43,7 @@ function settingsFrom(values: SettingsValues | null): Settings {
   const int = (key: string, fallback: number) => (typeof values?.[key] === "number" ? (values[key] as number) : fallback);
   return {
     url: text("url", "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"),
+    format: text("format", "json") === "text" ? "text" : "json",
     path: text("path", "bitcoin.usd"),
     label: text("label", "BTC"),
     unit: text("unit", ""),
@@ -50,6 +65,15 @@ function pick(json: unknown, path: string): number {
   return typeof node === "number" ? node : NaN;
 }
 
+/** A plain-text answer, trimmed: a number when it is one, else the text cut to MAX_TEXT characters. */
+function fromText(body: string): number | string {
+  // The firmware draws a line break as a new line: a multi-line body becomes one line that can scroll.
+  // Cut before the copies are made: only MAX_TEXT characters reach the screen.
+  const text = body.slice(0, 10 * MAX_TEXT).replace(/\s+/g, " ").trim();
+  const n = text === "" ? NaN : Number(text);
+  return isFinite(n) ? n : text.slice(0, MAX_TEXT);
+}
+
 /** 1234567.8 → "1,234,568"; below 1000 up to two decimals: 23.46. */
 function format(value: number): string {
   const sign = value < 0 ? "-" : "";
@@ -61,14 +85,40 @@ function format(value: number): string {
 }
 
 /**
- * The front display: the number large, right-aligned; the label small on the left, with the unit under it. Nothing
- * here needs a text measured, so the bar's layout engine and its font tables stay out of the 128 KiB heap, which is
- * left for the JSON answer.
+ * A text after the label and the unit, in a font with lowercase. The bar scrolls it in the room left only when it is
+ * wider; one that fits stands still (emulator, firmware 1.3.1).
  */
-function frame(s: Settings, value: number | null): Element[] {
-  const color = value === null ? WHITE : s.red > 0 && value >= s.red ? RED : s.yellow > 0 && value >= s.yellow ? YELLOW : WHITE;
+function line(s: Settings, text: string): Element {
+  const left = Math.max(textWidth(s.label, "small"), textWidth(s.unit, "small"));
+  const x = left > 0 ? left + TEXT_GAP : 0;
+  return {
+    id: "value",
+    type: "text",
+    text,
+    font: TEXT_FONT,
+    color: WHITE,
+    x,
+    y: 8,
+    align: "mid_left",
+    width: 72 - x,
+    scroll_rate: 1200,
+    scroll_start_delay: 1500,
+    scroll_repeat_delay: 1500,
+  };
+}
+
+/**
+ * The front display: a number large, right-aligned, or a text that is no number after the label; the label small on
+ * the left, with the unit under it. Only the label and the unit are measured, with busy-lib's glyph map of the small
+ * font; the layout engine and the other maps stay out of the 128 KiB heap, which is left for the answer.
+ */
+function frame(s: Settings, value: number | string | null): Element[] {
+  const color =
+    typeof value !== "number" ? WHITE : s.red > 0 && value >= s.red ? RED : s.yellow > 0 && value >= s.yellow ? YELLOW : WHITE;
   const out: Element[] = [
-    { id: "value", type: "text", text: value === null ? "--" : format(value), font: "extra_large", color, x: 72, y: 8, align: "mid_right" },
+    typeof value === "string"
+      ? line(s, value)
+      : { id: "value", type: "text", text: value === null ? "--" : format(value), font: NUMBER_FONT, color, x: 72, y: 8, align: "mid_right" },
     { id: "label", type: "text", text: s.label, font: "small", color: GRAY, x: 0, y: s.unit === "" ? 8 : 4, align: "mid_left" },
   ];
   if (s.unit !== "") out.push({ id: "unit", type: "text", text: s.unit, font: "small", color: GRAY, x: 0, y: 12, align: "mid_left" });
@@ -83,8 +133,8 @@ function main(): void {
   const screen = createScreen(APP, report);
 
   let settings: Settings | null = null;
-  /** The last number read; null until the first answer and after a failed request. */
-  let value: number | null = null;
+  /** The last value read: a number, or a plain-text answer that is none; null until the first answer and after a failed request. */
+  let value: number | string | null = null;
   let loading = false;
   let timer: ReturnType<typeof setInterval> | undefined;
   let stopped = false;
@@ -101,10 +151,14 @@ function main(): void {
     void fetch(s.url, { headers })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
+        return s.format === "text" ? res.text() : res.json();
       })
-      .then((json: unknown) => {
-        const n = pick(json, s.path);
+      .then((body: unknown) => {
+        if (s.format === "text") {
+          value = fromText(body as string);
+          return;
+        }
+        const n = pick(body, s.path);
         if (!isFinite(n)) throw new Error(`no number at ${s.path}`);
         value = n;
       })

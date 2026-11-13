@@ -5,9 +5,19 @@
     "url": {
       "type": "string",
       "label": "Address",
-      "description": "An http(s) address that answers JSON.",
+      "description": "An http(s) address that answers JSON or plain text.",
       "default": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
       "max_length": 255
+    },
+    "format": {
+      "type": "enum",
+      "label": "Answer format",
+      "description": "Text: the whole answer is shown, a number like a number, and the path is not used.",
+      "default": "json",
+      "options": [
+        { "value": "json", "label": "JSON" },
+        { "value": "text", "label": "Plain text" }
+      ]
     },
     "path": {
       "type": "string",

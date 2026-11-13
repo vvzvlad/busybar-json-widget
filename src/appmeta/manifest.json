@@ -4,6 +4,6 @@
   "name": "JSON Widget",
   "version": "0.1.0",
   "api_version": "27.12.0",
-  "description": "Any number from any JSON endpoint, with thresholds.",
+  "description": "A number or a line of text from any JSON or plain-text endpoint, with thresholds.",
   "author": "vvzvlad"
 }
