@@ -1,0 +1,65 @@
+{
+  "format_version": 1,
+  "version": 1,
+  "fields": {
+    "url": {
+      "type": "string",
+      "label": "Address",
+      "description": "An http(s) address that answers JSON.",
+      "default": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+      "max_length": 255
+    },
+    "path": {
+      "type": "string",
+      "label": "Path to the number",
+      "description": "Keys with dots, list items in brackets: data.result[0].value[1].",
+      "default": "bitcoin.usd",
+      "max_length": 128
+    },
+    "label": {
+      "type": "string",
+      "label": "Label",
+      "description": "Shown small before the number.",
+      "default": "BTC",
+      "max_length": 8
+    },
+    "unit": {
+      "type": "string",
+      "label": "Unit",
+      "description": "Shown small under the label.",
+      "default": "",
+      "max_length": 4
+    },
+    "interval_s": {
+      "type": "integer",
+      "label": "Seconds between requests",
+      "default": 60,
+      "min": 10,
+      "max": 86400
+    },
+    "yellow": {
+      "type": "integer",
+      "label": "Yellow from",
+      "description": "The number turns yellow at this value and above. 0 turns it off.",
+      "default": 0,
+      "min": 0,
+      "max": 2000000000
+    },
+    "red": {
+      "type": "integer",
+      "label": "Red from",
+      "description": "The number turns red at this value and above. 0 turns it off.",
+      "default": 0,
+      "min": 0,
+      "max": 2000000000
+    },
+    "auth": {
+      "type": "string",
+      "label": "Authorization header",
+      "description": "Sent as is when not empty, like Bearer <token>.",
+      "default": "",
+      "max_length": 255,
+      "sensitive": true
+    }
+  }
+}
